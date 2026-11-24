@@ -102,7 +102,8 @@ jobs:
       - name: Preparar directorio de informes
         run: |
           mkdir -p reports/zap
-          sudo chown 1000:1000 reports/zap
+          cp security/juice-shop.context reports/zap/juice-shop.context
+          sudo chown -R 1000:1000 reports/zap
 
       - name: Ejecutar analisis DAST con ZAP
         run: |
@@ -114,6 +115,7 @@ jobs:
             ghcr.io/zaproxy/zaproxy:stable \
             zap-full-scan.py \
             -t http://127.0.0.1:3000 \
+            -n juice-shop.context \
             -j \
             -m 2 \
             -T 10 \
@@ -125,10 +127,25 @@ jobs:
       - name: Comprobar informe ZAP
         run: |
           test -s reports/zap/zap-report.json
-          echo "Informe JSON generado correctamente"
-          jq -r \
-            '[.site[]?.alerts[]?] | length' \
-            reports/zap/zap-report.json
+
+          jq '
+            .site |= map(
+              select(."@name" == "http://127.0.0.1:3000")
+            )
+          ' reports/zap/zap-report.json \
+            > reports/zap/zap-report-local.json
+
+          jq -e '.site | length == 1' \
+            reports/zap/zap-report-local.json
+
+          echo "Alertas de Juice Shop:"
+          jq '[.site[].alerts[]] | length' \
+            reports/zap/zap-report-local.json
+
+          echo "Alertas High:"
+          jq '[.site[].alerts[] |
+            select(.riskcode == "3")] | length' \
+            reports/zap/zap-report-local.json
 
       - name: Guardar informes como artefactos
         if: always()
