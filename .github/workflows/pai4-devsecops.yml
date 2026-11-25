@@ -80,11 +80,14 @@ jobs:
 
       - name: Análisis SCA (Dependencias npm - package-lock.json)
         run: |
+          if [ ! -f package-lock.json ]; then
+            npm install --package-lock-only --ignore-scripts --legacy-peer-deps || true
+          fi
           trivy fs \
-            --scanners vuln \
+            --scaners-vuln \
             --format json \
-            --output trivy-sca.json \
-            package-lock.json
+            --output trivy-sca.json
+            .
 
       - name: Análisis IaC (Contenedor - Dockerfile)
         run: |
